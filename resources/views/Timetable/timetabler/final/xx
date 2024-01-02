@@ -1,0 +1,62 @@
+@php
+    // Function to retrieve available units based on dynamic parameters
+    function getAvailableUnits($classroom_id, $day_id, $timeslot_id) {
+        $assignedUnits = App\Models\Timetable::where('classroom_id', $classroom_id)
+            ->where('day_id', $day_id)
+            ->where('timeslot_id', $timeslot_id)
+            ->pluck('unit_id');
+
+        $assignedUnitsCount = App\Models\Timetable::where('day_id', $day_id)
+            ->where('classroom_id', $classroom_id)
+            ->where('timeslot_id', $timeslot_id)
+            ->whereIn('unit_id', $assignedUnits)
+            ->count();
+
+        $availableUnits = App\Models\Unit::whereNotIn('id', $assignedUnits)
+            ->select('lecturer_id', 'unit_code', 'id', 'unit_name')
+            ->get();
+
+        $courseUnits = $availableUnits->pluck('id')->toArray();
+
+        foreach ($courseUnits as $unit) {
+            $assignedCount = App\Models\Timetable::where('unit_id', $unit)
+                ->where('day_id', $day_id)
+                ->where('timeslot_id', $timeslot_id)
+                ->count();
+
+            if ($assignedCount >= 2 || in_array($unit, $assignedUnits->toArray())) {
+                $availableUnits = $availableUnits->reject(function ($item) use ($unit) {
+                    return $item->id === $unit;
+                });
+            }
+        }
+
+        return $availableUnits->take(2); // Return only the first 2 available units
+    }
+
+    // Function to loop and return the available units
+    function loopAndReturnAvailableUnits($classroom_id, $day_id, $timeslot_id) {
+        $availableUnits = getAvailableUnits($classroom_id, $day_id, $timeslot_id);
+
+        foreach ($availableUnits as $unit) {
+            echo "Unit Code: {$unit->unit_code}, Unit Name: {$unit->unit_name}, Lecturer ID: {$unit->lecturer_id}<br>";
+        }
+    }
+
+    // Call the function to loop and return available units for a specific classroom, day, and timeslot
+    loopAndReturnAvailableUnits($classroom_id, $day_id, $timeslot_id);
+@endphp
+
+{{-- @php
+                                             $units = App\Models\Unit::where('course_id', $courses_id)
+                                                ->select('lecturer_id', 'unit_code', 'id', 'unit_name')
+                                                 ->get();
+                                        @endphp --}}
+
+
+
+                                        {{-- @foreach ($units as $unit)
+                                            <option value="{{ $unit->id }}">{{ $unit->unit_code }} -
+                                                {{ $unit->unit_name }} - Lec - {{ $unit->unit_lecturer->name }} - (
+                                                {{ $unit->unit_lecturer->email }})</option>
+                                        @endforeach --}}
